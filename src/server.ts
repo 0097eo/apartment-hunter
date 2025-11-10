@@ -6,6 +6,9 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { notFound, errorHandler } from './middleware/errorMiddleware';
 import prisma from './services/prisma';
+import passport from 'passport';
+import configurePassport from './config/passport';
+import mainRouter from './routes/index';
 
 dotenv.config();
 
@@ -26,6 +29,8 @@ app.use(morgan('dev')); // Logger for HTTP requests
 app.use(express.json()); // Body parser for JSON
 app.use(cookieParser()); // Cookie parser for auth cookies
 app.use(express.urlencoded({ extended: true })); // For form data
+app.use(passport.initialize());
+configurePassport(); // Configure passport strategies
 
 // Basic Route
 app.get('/', (req: Request, res: Response) => {
@@ -33,6 +38,8 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // ---API ROUTES--- //
+app.use('/api', mainRouter);
+
 
 // Error Handling Middleware (must be last)
 app.use(notFound);
