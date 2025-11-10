@@ -1,10 +1,11 @@
 import cloudinary from "../config/cloudinary";
-import { AuthError } from "./customErrors";
+import { AuthError, NotFoundError } from "./customErrors";
 
 export interface UploadResult {
     public_id: string;
     secure_url: string;
 }
+
 
 /**
  * Uploads an image buffer to Cloudinary.
@@ -48,15 +49,27 @@ export const uploadImageToCloudinary = async (
 export const deleteImageFromCloudinary = async (publicId: string): Promise<any> => {
     try {
         const result = await cloudinary.uploader.destroy(publicId);
-        if (result.result !== 'ok') {
-            // Log if deletion was not explicitly 'ok', but don't throw for 404 (file not found)
-            console.warn(`Cloudinary deletion status for ${publicId}: ${result.result}`);
+        
+        if (result.result === 'not found') {
+            console.warn(`Cloudinary deletion status for ${publicId}: Resource not found (safe to ignore).`);
+            return result; // Return success as the desired state (deleted) is achieved
         }
+        
+        if (result.result !== 'ok') {
+            // Treat any other non-'ok' result as a failure
+            throw new Error(`Cloudinary deletion failed with status: ${result.result}`);
+        }
+        
         console.log(`Cloudinary deletion success: ${publicId}`);
         return result;
-    } catch (error) {
-        console.error('Cloudinary Delete Error:', error);
-        throw new AuthError('Failed to delete image from external service (Cloudinary).');
+
+    } catch (error: any) {
+        if (error.http_code === 404 || error.message?.includes('not found')) {
+
+            throw new NotFoundError(`Image not found on Cloudinary: ${publicId}`);
+        }
+        console.error('Cloudinary Delete Error (Final Throw):', error);
+        throw new AuthError(`Failed to delete image from external service (Cloudinary). Details: ${error.message || error}`);
     }
 };
 
@@ -65,29 +78,34 @@ export const deleteImageFromCloudinary = async (publicId: string): Promise<any> 
  * Assumes the URL format contains the folder path.
  * Example URL: .../apartment-hunter/properties/ID/image-name.jpg
  */
+
 export const getPublicIdFromUrl = (url: string): string | null => {
     try {
-        // Regex to match the part after /vXXXXXXXXX/ and before the extension
-        // It finds the folder structure: apartment-hunter/properties/{id}/...
-        const parts = url.split('/');
-        const versionIndex = parts.findIndex(part => part.startsWith('v'));
+        // Find the last segment of the path which contains the public ID + extension
+        const urlParts = new URL(url).pathname.split('/');
         
-        if (versionIndex === -1 || versionIndex + 1 >= parts.length) {
-             return null;
+        // Find the index of 'upload' which is just before the version number (vXXXXXXXXX)
+        const uploadIndex = urlParts.indexOf('upload');
+        
+        if (uploadIndex === -1 || uploadIndex + 2 >= urlParts.length) {
+            return null; // Invalid Cloudinary URL format
         }
 
-        // Get the part of the URL that contains the public ID structure (e.g., apartment-hunter/properties/id/image-name)
-        const publicIdParts = parts.slice(versionIndex + 1);
+        // The public ID starts after the version number (index uploadIndex + 2)
+        const publicIdSegments = urlParts.slice(uploadIndex + 2);
         
-        // Remove the file extension from the last part
-        const lastPart = publicIdParts[publicIdParts.length - 1];
-        publicIdParts[publicIdParts.length - 1] = lastPart.substring(0, lastPart.lastIndexOf('.'));
+        // The last segment contains the public_id and file extension (e.g., image-name.png)
+        const lastSegment = publicIdSegments[publicIdSegments.length - 1];
         
-        // Join back to form the public ID
-        return publicIdParts.join('/');
+        // Remove the file extension (everything from the last dot)
+        publicIdSegments[publicIdSegments.length - 1] = lastSegment.substring(0, lastSegment.lastIndexOf('.'));
         
+        // Join the path segments back together (e.g., apartment-hunter/properties/id/image-name)
+        return publicIdSegments.join('/');
+
     } catch (error) {
-        console.error('Failed to parse public ID from URL:', url);
+        // Handle cases where new URL() fails (e.g., malformed URL)
+        console.error('Failed to parse public ID from URL:', url, error);
         return null;
     }
 };

@@ -81,14 +81,19 @@ export const deletePropertyImage = async (
 
     const publicId = getPublicIdFromUrl(imageUrl);
     if (!publicId) {
-        throw new NotFoundError('Invalid or unparsable image URL for deletion.');
+        // If the URL is not parsable, treat it as a validation error
+        throw new ValidationError('The provided image URL is not a recognizable Cloudinary URL format for deletion.');
     }
 
-    // 1. Delete from Cloudinary
+    // 1. Delete from Cloudinary 
     await deleteImageFromCloudinary(publicId);
 
     // 2. Remove URL from database array
     const newImageUrls = property.image_urls.filter(url => url !== imageUrl);
+
+    if (newImageUrls.length === property.image_urls.length) {
+        throw new NotFoundError('Image URL not found in property database record. No deletion performed on DB.');
+    }
 
     const updatedProperty = await prisma.property.update({
         where: { id: propertyId },
