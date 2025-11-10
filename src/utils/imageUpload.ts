@@ -1,7 +1,7 @@
 import cloudinary from "../config/cloudinary";
 import { AuthError } from "./customErrors";
 
-interface UploadResult {
+export interface UploadResult {
     public_id: string;
     secure_url: string;
 }

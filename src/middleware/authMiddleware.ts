@@ -48,3 +48,30 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
         next(error); 
     }
 };
+
+export const authenticateOptional = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        let token;
+
+        // Optional token in header or cookie
+        if (req.headers.authorization?.startsWith('Bearer')) {
+            token = req.headers.authorization.split(' ')[1];
+        } else if (req.cookies?.jwt) {
+            token = req.cookies.jwt;
+        }
+
+        if (token) {
+            const decoded = verifyToken(token);
+            const user = await findUserById(decoded.id);
+
+            if (user) {
+                req.user = user;
+            }
+        }
+
+        // Always continue — even if no token or invalid token
+        next();
+    } catch {
+        next(); // silently continue without user
+    }
+};
