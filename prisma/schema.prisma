@@ -1,11 +1,16 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
+
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 // --- ENUMS ---
 
 enum AuthProvider {
@@ -42,28 +47,53 @@ model User {
   created_at      DateTime       @default(now())
   updated_at      DateTime       @updatedAt
 
-  // Relationships
-  properties    Property[]
-  viewings      Viewing[]
-  comparisons   Comparison[]
-  tags          Tag[]
+  // Relationships (Explicit naming added for all)
+  listings        Listing[]       @relation("PostedListings")     
+  savedProperties SavedProperty[] @relation("SavedProperties")
+  viewings        Viewing[]       @relation("ScheduledViewings")   
+  comparisons     Comparison[]    @relation("UserComparisons")    
+  tags            Tag[]           @relation("UserTags")            
 }
 
-model Property {
+
+model Listing {
   id              String           @id @default(uuid())
-  user_id         String
+  user_id         String           
   title           String           @db.VarChar(200)
-  address         String           @db.VarChar(255) // e.g., Estate Name, Street Address
-  city            String           @db.VarChar(100) // e.g., Nairobi, Mombasa (Major city/town)
-  county          String           @db.VarChar(100)
-  zip_code        String?          @db.VarChar(20)  // Optional postal code
-  price           Decimal          @db.Decimal(12, 2) // KES
+  address         String           @db.VarChar(255) 
+  city            String           @db.VarChar(100) 
+  county          String           @db.VarChar(100) 
+  zip_code        String?          @db.VarChar(20)  
+  price           Decimal          @db.Decimal(12, 2) 
   bedrooms        Int
   bathrooms       Float 
   square_feet     Int?
   property_type   PropertyType
-  listing_url     String?
-  image_urls      String[]
+  listing_url     String?          
+  image_urls      String[]         
+  is_active       Boolean          @default(true)
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  // Relationships
+  lister          User             @relation("PostedListings", fields: [user_id], references: [id], onDelete: Cascade) // 1. Listing side
+  savedProperties SavedProperty[]  @relation("SavedListingCopies")
+  viewings        Viewing[]        @relation("ListingViewings")
+  
+  @@index([user_id])
+  @@index([city])
+  @@index([county])
+  @@index([price])
+}
+
+
+
+model SavedProperty {
+  id              String           @id @default(uuid())
+  user_id         String           
+  listing_id      String           
+  
+
   status          PropertyStatus   @default(saved)
   notes           String?          @db.Text
   pros            String[]
@@ -72,22 +102,25 @@ model Property {
   updated_at      DateTime         @updatedAt
 
   // Relationships
-  user            User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  viewings        Viewing[]
-  propertyTags    PropertyTag[] 
-
-  // Indexes (updated for county)
+  hunter          User             @relation("SavedProperties", fields: [user_id], references: [id], onDelete: Cascade) 
+  listing         Listing          @relation("SavedListingCopies", fields: [listing_id], references: [id], onDelete: Cascade)
+  viewings        Viewing[]        @relation("SavedPropertyViewings")
+  tags            SavedPropertyTag[] @relation("SavedPropertyTags")
+  
+  // Indexes 
   @@index([user_id])
+  @@index([listing_id])
   @@index([status])
-  @@index([city])
-  @@index([county])
-  @@index([price])
+
+  @@unique([user_id, listing_id], name: "saved_property_pk") 
 }
+
 
 model Viewing {
   id                String    @id @default(uuid())
-  property_id       String
-  user_id           String 
+  user_id           String    
+  listing_id        String    
+  
   scheduled_date    DateTime  
   scheduled_time    DateTime? 
   duration_minutes  Int       @default(30)
@@ -100,55 +133,59 @@ model Viewing {
   updated_at        DateTime  @updatedAt
 
   // Relationships
-  property          Property  @relation(fields: [property_id], references: [id], onDelete: Cascade)
-  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  hunter            User           @relation("ScheduledViewings", fields: [user_id], references: [id], onDelete: Cascade)
+  listing           Listing        @relation("ListingViewings", fields: [listing_id], references: [id], onDelete: Cascade)
+  saved_property_id String?
+  savedProperty     SavedProperty? @relation("SavedPropertyViewings", fields: [saved_property_id], references: [id], onDelete: SetNull)
 
-  // Indexes
-  @@index([property_id])
+  // Indexes 
+  @@index([listing_id])
   @@index([user_id])
   @@index([scheduled_date])
 }
+
 
 model Comparison {
   id              String    @id @default(uuid())
   user_id         String
   name            String    @db.VarChar(100)
-  property_ids    String[]  // Array of Property UUIDs
+  listing_ids     String[]  
   created_at      DateTime  @default(now())
   updated_at      DateTime  @updatedAt
 
   // Relationships
-  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user            User      @relation("UserComparisons", fields: [user_id], references: [id], onDelete: Cascade) 
 
-  // Indexes
+  // Indexes 
   @@index([user_id])
 }
 
+
 model Tag {
   id              String          @id @default(uuid())
-  user_id         String
+  user_id         String          
   name            String          @db.VarChar(50)
   color           String?         @db.VarChar(7) 
   created_at      DateTime        @default(now())
 
   // Relationships
-  user            User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  propertyTags    PropertyTag[]
+  user            User            @relation("UserTags", fields: [user_id], references: [id], onDelete: Cascade) // 5. Tag side
+  savedPropertyTags SavedPropertyTag[] 
 
   // Constraint: unique tag name per user
   @@unique([user_id, name])
   @@index([user_id])
 }
 
-model PropertyTag {
-  property_id     String
+model SavedPropertyTag { 
+  saved_property_id String 
   tag_id          String
   created_at      DateTime        @default(now())
 
   // Relationships
-  property        Property        @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  savedProperty   SavedProperty   @relation("SavedPropertyTags", fields: [saved_property_id], references: [id], onDelete: Cascade) // Fix 6: SavedPropertyTag side
   tag             Tag             @relation(fields: [tag_id], references: [id], onDelete: Cascade)
 
   // Composite key for the join table
-  @@id([property_id, tag_id])
+  @@id([saved_property_id, tag_id]) 
 }
