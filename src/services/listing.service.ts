@@ -1,5 +1,4 @@
-// src/services/listing.service.ts
-import prisma from './prisma';
+import prisma from '../utils/prisma';
 import { Listing, Prisma } from '@prisma/client';
 import { uploadImageToCloudinary, deleteImageFromCloudinary, getPublicIdFromUrl } from '../utils/imageUpload';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/customErrors';

@@ -1,4 +1,4 @@
-import prisma from './prisma';
+import prisma from '../utils/prisma';
 import bcrypt from 'bcrypt';
 import { User, AuthProvider } from '../generated/prisma';
 import { AuthError, NotFoundError } from '../utils/customErrors';

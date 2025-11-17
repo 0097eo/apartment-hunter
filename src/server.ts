@@ -5,7 +5,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { notFound, errorHandler } from './middleware/errorMiddleware';
-import prisma from './services/prisma';
+import prisma from './utils/prisma';
 import passport from 'passport';
 import configurePassport from './config/passport';
 import mainRouter from './routes/index';

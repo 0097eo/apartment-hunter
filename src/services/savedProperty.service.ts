@@ -1,4 +1,4 @@
-import prisma from './prisma';
+import prisma from '../utils/prisma';
 import { PropertyStatus, Prisma } from '@prisma/client';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/customErrors';
 
