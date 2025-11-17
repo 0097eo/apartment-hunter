@@ -1,0 +1,26 @@
+// src/routes/savedProperty.routes.ts
+import { Router } from 'express';
+import { protect } from '../middleware/authMiddleware';
+import {
+    saveListingToHunterList,
+    getHunterSavedProperties,
+    getSingleSavedProperty,
+    updateHunterSavedProperty,
+    deleteHunterSavedProperty,
+} from '../controllers/savedProperty.controller';
+
+const router = Router();
+
+// All routes require authentication
+router.use(protect);
+
+router.route('/')
+    .post(saveListingToHunterList)    // POST /api/saved-properties
+    .get(getHunterSavedProperties);  // GET /api/saved-properties
+
+router.route('/:id')
+    .get(getSingleSavedProperty)      // GET /api/saved-properties/:id
+    .put(updateHunterSavedProperty)   // PUT /api/saved-properties/:id
+    .delete(deleteHunterSavedProperty); // DELETE /api/saved-properties/:id
+
+export default router;
