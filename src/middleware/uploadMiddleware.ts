@@ -1,42 +1,42 @@
-// src/middleware/uploadMiddleware.ts
-
+import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { Request } from 'express';
 import { ValidationError } from '../utils/customErrors';
 
-// File filter to accept only images
-const imageFileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    // Check file type
-    if (file.mimetype.startsWith('image/')) {
-        // Check for common image formats
-        const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-        const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
-        
-        if (fileExtension && allowedExtensions.includes(fileExtension)) {
-            cb(null, true); // Success: null for error, true to accept
-        } else {
-             // Reject: Invalid extension. Pass Error as first argument.
-            cb(new ValidationError('Invalid file extension. Only JPG, JPEG, PNG, and WEBP images are allowed.'));
-        }
-    } else {
-        // Reject: Not an image MIME type. Pass Error as first argument.
-        cb(new ValidationError('Invalid file type. Only images are allowed.'));
-    }
-};
-
-// Multer configuration for file storage in memory (buffer)
-// This is necessary for Cloudinary which prefers to upload directly from a buffer/stream.
+// Configure storage for multer - memory storage is used because we upload to Cloudinary immediately
 const storage = multer.memoryStorage();
 
-// Max 10 images per request, max 10MB per file
-const upload = multer({
+// Multer instance for handling multi-image uploads
+const listingUpload = multer({
     storage: storage,
     limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB per file
+        fileSize: 5 * 1024 * 1024, // 5MB limit per file
         files: 10, // Max 10 files
     },
-    fileFilter: imageFileFilter,
-});
+    fileFilter: (req, file, cb) => {
+        // Accept only image files
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            // Pass a ValidationError to the error handler
+            cb(new ValidationError('Only image files are allowed.'));
+        }
+    }
+}).array('images', 10); // 'images' is the field name in the form data, maxCount 10
 
-// Middleware function for uploading multiple images
-export const uploadImages = upload.array('images', 10); // 'images' is the field name in the form-data
+/**
+ * Middleware to handle file uploads for listings using Multer.
+ * Attaches 'files' array to the request object.
+ */
+export const uploadImages = (req: Request, res: Response, next: NextFunction) => {
+    listingUpload(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            // A Multer error occurred (e.g., file count, size)
+            return next(new ValidationError(`File upload error: ${err.message}`));
+        } else if (err) {
+            // Other errors (e.g., fileFilter error)
+            return next(err);
+        }
+        // Success
+        next();
+    });
+};
