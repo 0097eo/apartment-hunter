@@ -1,5 +1,5 @@
 import prisma from '../utils/prisma';
-import { Listing, Prisma } from '@prisma/client';
+import { Listing, Prisma, PropertyType } from '@prisma/client';
 import { uploadImageToCloudinary, deleteImageFromCloudinary, getPublicIdFromUrl } from '../utils/imageUpload';
 import { ForbiddenError, NotFoundError, ValidationError } from '../utils/customErrors';
 
@@ -203,4 +203,102 @@ export const deleteListing = async (listingId: string, userId: string): Promise<
         data: { is_active: false },
     });
     
+};
+
+/**
+ * Global Search and Filter for all Active Listings.
+ * Includes 'is_saved' status if a userId is provided.
+ */
+export const searchPublicListings = async (
+    filter: { 
+        city?: string, 
+        county?: string, 
+        minPrice?: number, 
+        maxPrice?: number, 
+        bedrooms?: number, 
+        property_type?: PropertyType 
+    },
+    userId: string | undefined, // Optional for unauthenticated users
+    page: number = 1, 
+    limit: number = 20,
+    sortBy: 'price_asc' | 'price_desc' | 'newest' = 'newest'
+): Promise<{ 
+    listings: (Listing & { is_saved: boolean })[], 
+    totalCount: number, 
+    page: number, 
+    limit: number, 
+    totalPages: number 
+}> => {
+    const skip = (page - 1) * limit;
+
+    // Build the WHERE clause for filtering
+    const where: Prisma.ListingWhereInput = {
+        is_active: true, // Only search active listings
+        ...(filter.city && { city: { equals: filter.city, mode: 'insensitive' } }),
+        ...(filter.county && { county: { equals: filter.county, mode: 'insensitive' } }),
+        ...(filter.bedrooms && { bedrooms: filter.bedrooms }),
+        ...(filter.property_type && { property_type: filter.property_type }),
+        ...(filter.minPrice || filter.maxPrice ? {
+            price: {
+                ...(filter.minPrice && { gte: new Prisma.Decimal(filter.minPrice) }),
+                ...(filter.maxPrice && { lte: new Prisma.Decimal(filter.maxPrice) }),
+            }
+        } : {})
+    };
+
+    // Determine the ORDER BY clause
+    let orderBy: Prisma.ListingOrderByWithRelationInput;
+    switch (sortBy) {
+        case 'price_asc':
+            orderBy = { price: 'asc' };
+            break;
+        case 'price_desc':
+            orderBy = { price: 'desc' };
+            break;
+        case 'newest':
+        default:
+            orderBy = { created_at: 'desc' };
+            break;
+    }
+
+    // Fetch listings and total count
+    const [listings, totalCount] = await prisma.$transaction([
+        prisma.listing.findMany({
+            where,
+            orderBy,
+            skip,
+            take: limit,
+        }),
+        prisma.listing.count({ where }),
+    ]);
+
+    let savedListingIds: Set<string> = new Set();
+    
+    // If user is authenticated, find their saved listing IDs for the current batch
+    if (userId && listings.length > 0) {
+        const listingIds = listings.map(l => l.id);
+        const savedProperties = await prisma.savedProperty.findMany({
+            where: {
+                user_id: userId,
+                listing_id: { in: listingIds },
+            },
+            select: { listing_id: true }
+        });
+        // Create a quick lookup Set for O(1) checking
+        savedListingIds = new Set(savedProperties.map(sp => sp.listing_id));
+    }
+
+    // Map results to include the is_saved flag
+    const mappedListings = listings.map(listing => ({
+        ...listing,
+        is_saved: savedListingIds.has(listing.id),
+    })) as (Listing & { is_saved: boolean })[];
+
+    return {
+        listings: mappedListings,
+        totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+    };
 };

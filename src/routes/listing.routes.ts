@@ -1,6 +1,5 @@
-// src/routes/listing.routes.ts
 import { Router } from 'express';
-import { protect } from '../middleware/authMiddleware';
+import { protect, authenticateOptional } from '../middleware/authMiddleware';
 import { uploadImages } from '../middleware/uploadMiddleware';
 import {
     createListing,
@@ -8,9 +7,14 @@ import {
     getListingDetails,
     updateListing,
     deleteListing,
+    getPublicListings,
 } from '../controllers/listing.controller';
 
 const router = Router();
+
+// Global Public Listing Search
+router.route('/public')
+    .get(authenticateOptional, getPublicListings);
 
 // Routes for Lister/Agent features
 router.route('/')

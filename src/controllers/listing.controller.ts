@@ -159,3 +159,48 @@ export const deleteListing = async (req: AuthenticatedRequest, res: Response, ne
         next(error);
     }
 };
+
+// GET /api/listings/public - Global Search and Filter for all Active Listings
+export const getPublicListings = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+        // userId is optional, provided by authenticateOptional middleware
+        const userId = req.user?.id; 
+
+        const { city, county, minPrice, maxPrice, bedrooms, property_type, page, limit, sortBy } = req.query;
+
+        // Basic parsing and optional validation
+        const filter = {
+            city: city as string | undefined,
+            county: county as string | undefined,
+            minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
+            maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
+            bedrooms: bedrooms ? parseInt(bedrooms as string, 10) : undefined,
+            property_type: property_type && isValidPropertyType(property_type as string) ? property_type as PropertyType : undefined,
+        };
+        
+        const pageNum = parseInt(page as string) || 1;
+        const limitNum = parseInt(limit as string) || 20;
+        const sortByValue = sortBy as 'price_asc' | 'price_desc' | 'newest' || 'newest';
+
+        const result = await listingService.searchPublicListings(
+            filter, 
+            userId, 
+            pageNum, 
+            limitNum, 
+            sortByValue
+        );
+
+        res.status(200).json({ 
+            success: true, 
+            data: result.listings, 
+            pagination: {
+                page: result.page,
+                limit: result.limit,
+                totalCount: result.totalCount,
+                totalPages: result.totalPages,
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
