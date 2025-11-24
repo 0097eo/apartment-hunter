@@ -8,6 +8,10 @@ import {
     updateHunterSavedProperty,
     deleteHunterSavedProperty,
 } from '../controllers/savedProperty.controller';
+import {
+    addTagToProperty,
+    removeTagFromProperty,
+} from '../controllers/tag.controller';
 
 const router = Router();
 
@@ -22,5 +26,9 @@ router.route('/:id')
     .get(getSingleSavedProperty)      // GET /api/saved-properties/:id
     .put(updateHunterSavedProperty)   // PUT /api/saved-properties/:id
     .delete(deleteHunterSavedProperty); // DELETE /api/saved-properties/:id
+
+// --- Tagging Routes ---
+router.post('/:savedPropertyId/tags', addTagToProperty); // POST /api/saved-properties/:savedPropertyId/tags
+router.delete('/:savedPropertyId/tags/:tagId', removeTagFromProperty); // DELETE /api/saved-properties/:savedPropertyId/tags/:tagId
 
 export default router;
