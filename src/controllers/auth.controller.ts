@@ -110,5 +110,5 @@ export const googleAuthCallback = (req: Request, res: Response, next: NextFuncti
     
     // Redirect to the frontend URL
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    res.redirect(`${frontendUrl}/dashboard?token=${token}`); // Pass token via URL/Fragment for client-side persistence
+    res.redirect(`${frontendUrl}/dashboard`);
 };
