@@ -79,11 +79,12 @@ export const getMyListings = async (req: AuthenticatedRequest, res: Response, ne
 };
 
 // GET /api/listings/:id - Get single public listing details
-export const getListingDetails = async (req: Request, res: Response, next: NextFunction) => {
+export const getListingDetails = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
         const listingId = req.params.id;
+        const userId = req.user?.id;
 
-        const listing = await listingService.getListingById(listingId);
+        const listing = await listingService.getListingById(listingId, userId);
 
         res.status(200).json({ success: true, data: listing });
     } catch (error) {
@@ -99,7 +100,7 @@ export const updateListing = async (req: AuthenticatedRequest, res: Response, ne
 
         const listingId = req.params.id;
         const imageFiles = (req.files as Express.Multer.File[]) || [];
-        const { existingImageUrls: existingUrlsJson, ...updateFields } = req.body;
+        const { existingImageUrls: existingUrlsJson, id, ...updateFields } = req.body;
         
         // Handle existingImageUrls from form-data (can be string or JSON array string)
         let existingImageUrls: string[] = [];
@@ -125,7 +126,22 @@ export const updateListing = async (req: AuthenticatedRequest, res: Response, ne
                 if (key === 'price' || key === 'bathrooms') parsedUpdateData[key] = parseFloat(value);
                 else if (key === 'bedrooms' || key === 'square_feet') parsedUpdateData[key] = parseInt(value, 10);
                 else if (key === 'property_type' && isValidPropertyType(value)) parsedUpdateData[key] = value as PropertyType;
-                else if (key === 'is_active') parsedUpdateData[key] = value === 'true'; // Handle boolean from form-data
+                else if (key === 'is_active') {
+                    // Check if the value is explicitly 'true' or 'false'
+                    if (typeof value === 'string') {
+                        const lowerCaseValue = value.toLowerCase();
+                        if (lowerCaseValue === 'true') {
+                            parsedUpdateData[key] = true;
+                        } else if (lowerCaseValue === 'false') {
+                            parsedUpdateData[key] = false;
+                        }
+                        // If it's a string but not 'true' or 'false', ignore this field to prevent accidental deactivation
+                        // e.g., "true,true" will be ignored, preserving the current state
+                    } else if (typeof value === 'boolean') {
+                        parsedUpdateData[key] = value;
+                    }
+                    // If not a string or boolean, ignore to prevent accidental deactivation
+                }
                 else parsedUpdateData[key] = value;
             }
         }

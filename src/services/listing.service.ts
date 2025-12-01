@@ -54,10 +54,11 @@ export const createListing = async (
 
 /**
  * Finds a single Listing by ID, including upcoming viewings.
+ * Allows fetching inactive listings if the provided userId matches the lister's ID.
  */
-export const getListingById = async (listingId: string) => {
+export const getListingById = async (listingId: string, userId?: string) => {
     const listing = await prisma.listing.findUnique({
-        where: { id: listingId, is_active: true },
+        where: { id: listingId },
         include: {
             lister: {
                 select: { id: true, name: true, email: true, profile_picture: true }
@@ -81,6 +82,11 @@ export const getListingById = async (listingId: string) => {
     });
 
     if (!listing) {
+        throw new NotFoundError('Listing not found.');
+    }
+
+    // If listing is inactive, only allow the owner to view it
+    if (!listing.is_active && listing.user_id !== userId) {
         throw new NotFoundError('Listing not found or is inactive.');
     }
 

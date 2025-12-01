@@ -24,7 +24,7 @@ router.route('/my')
     .get(protect, getMyListings); // GET /api/listings/my
 
 router.route('/:id')
-    .get(getListingDetails) // GET /api/listings/:id (Publicly accessible)
+    .get(authenticateOptional, getListingDetails) // GET /api/listings/:id (Publicly accessible, optional auth for ownership checks)
     .put(protect, uploadImages, updateListing) // PUT /api/listings/:id (Requires JWT, must be owner, supports multi-part form)
     .delete(protect, deleteListing); // DELETE /api/listings/:id (Soft Delete)
 
